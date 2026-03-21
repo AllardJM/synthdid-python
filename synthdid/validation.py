@@ -248,15 +248,14 @@ def synthdid_out_of_time(
 # Plot
 # ---------------------------------------------------------------------------
 
-def synthdid_oot_plot(result, show_units=True, figsize=(12, 8)):
+def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
     """
     Plot out-of-time validation results.
 
-    Three-panel figure:
-      1. Main panel: actual treated average vs predicted counterfactual,
-         with individual treated unit trajectories (if N1 > 1 and show_units).
-      2. Residuals panel: actual - predicted over the predict period.
-      3. Metrics table.
+    Layout:
+      - Top row    : actual vs predicted trajectory (full width)
+      - Bottom-left: residuals bar chart
+      - Bottom-right: performance metrics table
 
     Parameters
     ----------
@@ -266,7 +265,7 @@ def synthdid_oot_plot(result, show_units=True, figsize=(12, 8)):
         If True and there are multiple treated units, plot each unit's
         trajectory as a faint line alongside the average.
     figsize : tuple
-        Figure size in inches.
+        Figure size in inches. Default (13, 10).
 
     Returns
     -------
@@ -280,81 +279,95 @@ def synthdid_oot_plot(result, show_units=True, figsize=(12, 8)):
     x = np.arange(T_predict)
 
     fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(3, 2, figure=fig,
-                           height_ratios=[3, 1.5, 1],
-                           hspace=0.45, wspace=0.35)
+    # Two rows: main plot on top, residuals + metrics side-by-side on bottom
+    gs = gridspec.GridSpec(
+        2, 2, figure=fig,
+        height_ratios=[2.2, 1.4],
+        hspace=0.55,
+        wspace=0.35,
+    )
 
-    ax_main = fig.add_subplot(gs[0, :])
-    ax_resid = fig.add_subplot(gs[1, :])
-    ax_table = fig.add_subplot(gs[2, :])
+    ax_main  = fig.add_subplot(gs[0, :])    # spans both columns
+    ax_resid = fig.add_subplot(gs[1, 0])
+    ax_table = fig.add_subplot(gs[1, 1])
 
-    # ---- Main panel --------------------------------------------------------
-    # Individual treated unit trajectories
+    # -------------------------------------------------------------------------
+    # Main panel: trajectories
+    # -------------------------------------------------------------------------
     N1 = result.actual_by_unit.shape[0]
     if show_units and N1 > 1:
         for i in range(N1):
             unit_label = (result.estimate.unit_names[result.estimate.setup["N0"] + i]
                           if result.estimate.unit_names else f"Unit {i+1}")
             ax_main.plot(x, result.actual_by_unit[i], color="black",
-                         alpha=0.2, linewidth=1, linestyle="--", label=unit_label if i == 0 else "_")
+                         alpha=0.2, linewidth=1, linestyle="--",
+                         label=unit_label if i == 0 else "_")
         ax_main.plot([], [], color="black", alpha=0.3, linewidth=1,
                      linestyle="--", label="Individual treated units")
 
-    # Average actual and predicted
     ax_main.plot(x, actual, color="black", linewidth=2.5,
-                 marker="o", markersize=4, label="Actual (treated avg)")
+                 marker="o", markersize=5, label="Actual (treated avg)")
     ax_main.plot(x, predicted, color="steelblue", linewidth=2.5,
-                 marker="s", markersize=4, linestyle="--", label="Predicted (synthetic control)")
-
-    # Shaded band between actual and predicted
+                 marker="s", markersize=5, linestyle="--",
+                 label="Predicted (synthetic control)")
     ax_main.fill_between(x, actual, predicted, alpha=0.12, color="steelblue",
-                          label="Prediction gap")
+                         label="Prediction gap")
 
-    ax_main.set_title("Out-of-Time Validation: Actual vs Predicted", fontsize=12)
-    ax_main.set_ylabel("Outcome")
+    ax_main.set_title("Out-of-Time Validation: Actual vs Predicted",
+                      fontsize=13, fontweight="bold", pad=10)
+    ax_main.set_ylabel("Outcome", fontsize=10)
     ax_main.set_xticks(x)
-    ax_main.set_xticklabels(t_labels, rotation=45, ha="right", fontsize=8)
-    ax_main.legend(fontsize=8, loc="best")
-    ax_main.axhline(np.mean(actual), color="gray", linestyle=":", linewidth=0.8, alpha=0.5)
+    ax_main.set_xticklabels(t_labels, rotation=45, ha="right", fontsize=9)
+    ax_main.legend(fontsize=9, loc="best", framealpha=0.8)
+    ax_main.axhline(np.mean(actual), color="gray", linestyle=":",
+                    linewidth=0.8, alpha=0.5)
     ax_main.grid(axis="y", alpha=0.3)
 
-    # ---- Residuals panel ---------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Bottom-left: residuals bar chart
+    # -------------------------------------------------------------------------
     colors = ["tomato" if r > 0 else "steelblue" for r in residuals]
     ax_resid.bar(x, residuals, color=colors, alpha=0.75, width=0.6)
     ax_resid.axhline(0, color="black", linewidth=1)
-    ax_resid.axhline(np.mean(residuals), color="gray", linewidth=1,
-                     linestyle="--", label=f"Mean residual (bias={np.mean(residuals):.2f})")
-    ax_resid.set_title("Residuals (Actual − Predicted)", fontsize=10)
-    ax_resid.set_ylabel("Residual")
+    ax_resid.axhline(
+        np.mean(residuals), color="gray", linewidth=1.2, linestyle="--",
+        label=f"Bias = {np.mean(residuals):.2f}",
+    )
+    ax_resid.set_title("Residuals (Actual − Predicted)", fontsize=10,
+                       fontweight="bold")
+    ax_resid.set_ylabel("Residual", fontsize=9)
     ax_resid.set_xticks(x)
     ax_resid.set_xticklabels(t_labels, rotation=45, ha="right", fontsize=8)
     ax_resid.legend(fontsize=8)
     ax_resid.grid(axis="y", alpha=0.3)
 
-    # ---- Metrics table -----------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Bottom-right: metrics table
+    # -------------------------------------------------------------------------
     ax_table.axis("off")
     m = result.metrics
     metrics_data = [
-        ["RMSE", f"{m['RMSE']:.4f}"],
-        ["MAE", f"{m['MAE']:.4f}"],
-        ["MAPE", f"{m['MAPE']:.2f}%"],
-        ["R²", f"{m['R2']:.4f}"],
-        ["Bias", f"{m['Bias']:.4f}"],
+        ["RMSE",          f"{m['RMSE']:.4f}"],
+        ["MAE",           f"{m['MAE']:.4f}"],
+        ["MAPE",          f"{m['MAPE']:.2f}%"],
+        ["R²",            f"{m['R2']:.4f}"],
+        ["Bias",          f"{m['Bias']:.4f}"],
         ["Max Abs Error", f"{m['MaxAbsError']:.4f}"],
-        ["N periods", str(m['N'])],
+        ["N periods",     str(m['N'])],
     ]
     col_labels = ["Metric", "Value"]
+
     tbl = ax_table.table(
         cellText=metrics_data,
         colLabels=col_labels,
         loc="center",
         cellLoc="center",
+        bbox=[0.05, 0.0, 0.9, 1.0],   # [left, bottom, width, height] in axes coords
     )
     tbl.auto_set_font_size(False)
-    tbl.set_fontsize(9)
-    tbl.scale(1, 1.4)
+    tbl.set_fontsize(9.5)
 
-    # Style header row
+    # Style header
     for j in range(len(col_labels)):
         tbl[0, j].set_facecolor("#4472C4")
         tbl[0, j].set_text_props(color="white", fontweight="bold")
@@ -364,7 +377,8 @@ def synthdid_oot_plot(result, show_units=True, figsize=(12, 8)):
         for j in range(len(col_labels)):
             tbl[i, j].set_facecolor("#EEF2FF" if i % 2 == 0 else "white")
 
-    ax_table.set_title("Performance Metrics", fontsize=10, pad=2)
+    ax_table.set_title("Performance Metrics", fontsize=10,
+                       fontweight="bold", pad=8)
 
     return fig
 
