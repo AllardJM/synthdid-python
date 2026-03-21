@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 from .estimator import synthdid_estimate, SynthdidEstimate, _contract3
+from .inference import vcov
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +63,14 @@ class OOTResult:
         Regression-style performance metrics.
     estimate : SynthdidEstimate
         The fitted synthdid model (weights, setup, etc.).
+    placebo_tau : float
+        The synthdid point estimate treating the predict period as post-treatment.
+        Should be close to zero in a valid pre-treatment holdout test.
+    placebo_se : float
+        Standard error of placebo_tau (via placebo method).
+    placebo_pvalue : float
+        Two-sided p-value for H0: placebo_tau = 0. Should be > 0.05 for a
+        well-specified model on a pre-treatment holdout period.
     """
     actual: np.ndarray
     predicted: np.ndarray
@@ -73,17 +82,23 @@ class OOTResult:
     time_names_predict: list
     metrics: dict
     estimate: SynthdidEstimate
+    placebo_tau: float = 0.0
+    placebo_se: float = float("nan")
+    placebo_pvalue: float = float("nan")
 
     def __repr__(self):
         m = self.metrics
+        sig = "✓ not significant" if self.placebo_pvalue > 0.05 else "✗ significant!"
         return (
             f"OOTResult(\n"
-            f"  pre_periods    = {self.time_names_pre[0]}..{self.time_names_pre[-1]} "
+            f"  pre_periods     = {self.time_names_pre[0]}..{self.time_names_pre[-1]} "
             f"({len(self.pre_cols)} periods)\n"
-            f"  predict_periods= {self.time_names_predict[0]}..{self.time_names_predict[-1]} "
+            f"  predict_periods = {self.time_names_predict[0]}..{self.time_names_predict[-1]} "
             f"({len(self.predict_cols)} periods)\n"
             f"  RMSE={m['RMSE']:.3f}, MAE={m['MAE']:.3f}, "
             f"R²={m['R2']:.3f}, Bias={m['Bias']:.3f}\n"
+            f"  Placebo τ={self.placebo_tau:.3f}, SE={self.placebo_se:.3f}, "
+            f"p={self.placebo_pvalue:.3f}  {sig}\n"
             f")"
         )
 
@@ -100,6 +115,8 @@ def synthdid_out_of_time(
     X=None,
     unit_names=None,
     time_names=None,
+    se_method="placebo",
+    se_replications=200,
     **synthdid_kwargs,
 ):
     """
@@ -129,6 +146,11 @@ def synthdid_out_of_time(
         Unit identifiers (row labels of Y).
     time_names : list or None
         Time identifiers (column labels of Y). Used for axis labels.
+    se_method : {'placebo', 'bootstrap', 'jackknife'}
+        Method for computing the SE of the placebo treatment effect.
+        Default 'placebo'. Use 'jackknife' for speed when N1 > 1.
+    se_replications : int
+        Number of replications for placebo/bootstrap SE. Default 200.
     **synthdid_kwargs
         Additional keyword arguments passed to synthdid_estimate
         (e.g. eta_omega, omega_intercept, do_sparsify).
@@ -137,7 +159,8 @@ def synthdid_out_of_time(
     -------
     OOTResult
         Contains actual values, predictions, residuals, per-unit actuals,
-        period indices, time labels, fitted estimate, and performance metrics.
+        period indices, time labels, fitted estimate, performance metrics,
+        and placebo significance test (tau, SE, p-value).
     """
     Y = np.asarray(Y, dtype=float)
     N, T = Y.shape
@@ -230,6 +253,25 @@ def synthdid_out_of_time(
 
     metrics = _compute_metrics(actual, predicted)
 
+    # -------------------------------------------------------------------------
+    # Placebo significance test
+    #
+    # The synthdid point estimate on [pre | predict] treats the predict period
+    # as post-treatment. In a valid pre-treatment holdout, this should be close
+    # to zero and not statistically significant (p > 0.05).
+    # -------------------------------------------------------------------------
+    placebo_tau = float(est)
+    try:
+        placebo_se_val = float(np.sqrt(vcov(est, method=se_method,
+                                            replications=se_replications)))
+        # Two-sided p-value: P(|Z| > |tau/se|) under H0: tau = 0
+        z_stat = placebo_tau / placebo_se_val if placebo_se_val > 0 else np.nan
+        from scipy.special import ndtr  # standard normal CDF
+        placebo_pvalue = float(2 * (1 - ndtr(abs(z_stat))))
+    except Exception:
+        placebo_se_val = float("nan")
+        placebo_pvalue = float("nan")
+
     return OOTResult(
         actual=actual,
         predicted=predicted,
@@ -241,6 +283,9 @@ def synthdid_out_of_time(
         time_names_predict=tnames_predict,
         metrics=metrics,
         estimate=est,
+        placebo_tau=placebo_tau,
+        placebo_se=placebo_se_val,
+        placebo_pvalue=placebo_pvalue,
     )
 
 
@@ -323,6 +368,26 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
                     linewidth=0.8, alpha=0.5)
     ax_main.grid(axis="y", alpha=0.3)
 
+    # Placebo test annotation in top-right corner of main panel
+    tau = result.placebo_tau
+    se  = result.placebo_se
+    pv  = result.placebo_pvalue
+    sig_str = "p > 0.05  ✓" if pv > 0.05 else "p ≤ 0.05  ✗"
+    color   = "green" if pv > 0.05 else "red"
+    annot = (
+        f"Synthdid placebo test\n"
+        f"τ = {tau:.2f}  (SE = {se:.2f})\n"
+        f"p = {pv:.3f}   {sig_str}"
+    )
+    ax_main.text(
+        0.98, 0.05, annot,
+        transform=ax_main.transAxes,
+        ha="right", va="bottom", fontsize=8.5,
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="white",
+                  edgecolor=color, linewidth=1.5, alpha=0.9),
+        color=color,
+    )
+
     # -------------------------------------------------------------------------
     # Bottom-left: residuals bar chart
     # -------------------------------------------------------------------------
@@ -346,6 +411,7 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
     # -------------------------------------------------------------------------
     ax_table.axis("off")
     m = result.metrics
+    pv = result.placebo_pvalue
     metrics_data = [
         ["RMSE",          f"{m['RMSE']:.4f}"],
         ["MAE",           f"{m['MAE']:.4f}"],
@@ -354,6 +420,10 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
         ["Bias",          f"{m['Bias']:.4f}"],
         ["Max Abs Error", f"{m['MaxAbsError']:.4f}"],
         ["N periods",     str(m['N'])],
+        ["— Placebo test —", ""],
+        ["Synthdid τ",    f"{result.placebo_tau:.4f}"],
+        ["SE",            f"{result.placebo_se:.4f}"],
+        ["p-value",       f"{pv:.3f}  {'✓' if pv > 0.05 else '✗'}"],
     ]
     col_labels = ["Metric", "Value"]
 
@@ -372,10 +442,22 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
         tbl[0, j].set_facecolor("#4472C4")
         tbl[0, j].set_text_props(color="white", fontweight="bold")
 
-    # Alternate row shading
+    # Alternate row shading; special style for the section divider row
+    divider_row = 8  # "— Placebo test —" is at index 7 in metrics_data → row 8 in table
     for i in range(1, len(metrics_data) + 1):
-        for j in range(len(col_labels)):
-            tbl[i, j].set_facecolor("#EEF2FF" if i % 2 == 0 else "white")
+        if i == divider_row:
+            for j in range(len(col_labels)):
+                tbl[i, j].set_facecolor("#D0D8F0")
+                tbl[i, j].set_text_props(fontweight="bold", fontstyle="italic")
+        else:
+            for j in range(len(col_labels)):
+                tbl[i, j].set_facecolor("#EEF2FF" if i % 2 == 0 else "white")
+
+    # Colour the p-value row green/red
+    pv_row = len(metrics_data)  # last row
+    pv_color = "#D4EDDA" if result.placebo_pvalue > 0.05 else "#F8D7DA"
+    for j in range(len(col_labels)):
+        tbl[pv_row, j].set_facecolor(pv_color)
 
     ax_table.set_title("Performance Metrics", fontsize=10,
                        fontweight="bold", pad=8)
