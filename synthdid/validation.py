@@ -85,6 +85,7 @@ class OOTResult:
     placebo_tau: float = 0.0
     placebo_se: float = float("nan")
     placebo_pvalue: float = float("nan")
+    se_method: str = "placebo"
 
     def __repr__(self):
         m = self.metrics
@@ -286,6 +287,7 @@ def synthdid_out_of_time(
         placebo_tau=placebo_tau,
         placebo_se=placebo_se_val,
         placebo_pvalue=placebo_pvalue,
+        se_method=se_method,
     )
 
 
@@ -368,26 +370,6 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
                     linewidth=0.8, alpha=0.5)
     ax_main.grid(axis="y", alpha=0.3)
 
-    # Placebo test annotation in top-right corner of main panel
-    tau = result.placebo_tau
-    se  = result.placebo_se
-    pv  = result.placebo_pvalue
-    sig_str = "p > 0.05  ✓" if pv > 0.05 else "p ≤ 0.05  ✗"
-    color   = "green" if pv > 0.05 else "red"
-    annot = (
-        f"Synthdid placebo test\n"
-        f"τ = {tau:.2f}  (SE = {se:.2f})\n"
-        f"p = {pv:.3f}   {sig_str}"
-    )
-    ax_main.text(
-        0.98, 0.05, annot,
-        transform=ax_main.transAxes,
-        ha="right", va="bottom", fontsize=8.5,
-        bbox=dict(boxstyle="round,pad=0.4", facecolor="white",
-                  edgecolor=color, linewidth=1.5, alpha=0.9),
-        color=color,
-    )
-
     # -------------------------------------------------------------------------
     # Bottom-left: residuals bar chart
     # -------------------------------------------------------------------------
@@ -420,9 +402,9 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
         ["Bias",          f"{m['Bias']:.4f}"],
         ["Max Abs Error", f"{m['MaxAbsError']:.4f}"],
         ["N periods",     str(m['N'])],
-        ["— Placebo test —", ""],
-        ["Synthdid τ",    f"{result.placebo_tau:.4f}"],
-        ["SE",            f"{result.placebo_se:.4f}"],
+        [f"— Synthdid test ({result.se_method} SE) —", ""],
+        ["τ",             f"{result.placebo_tau:.4f}"],
+        [f"SE ({result.se_method})", f"{result.placebo_se:.4f}"],
         ["p-value",       f"{pv:.3f}  {'✓' if pv > 0.05 else '✗'}"],
     ]
     col_labels = ["Metric", "Value"]
