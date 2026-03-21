@@ -402,7 +402,7 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
         ["Bias",          f"{m['Bias']:.4f}"],
         ["Max Abs Error", f"{m['MaxAbsError']:.4f}"],
         ["N periods",     str(m['N'])],
-        [f"— Synthdid test ({result.se_method} SE) —", ""],
+        [f"  Synthdid test ({result.se_method} SE)", ""],
         ["τ",             f"{result.placebo_tau:.4f}"],
         [f"SE ({result.se_method})", f"{result.placebo_se:.4f}"],
         ["p-value",       f"{pv:.3f}  {'✓' if pv > 0.05 else '✗'}"],
@@ -425,12 +425,16 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
         tbl[0, j].set_text_props(color="white", fontweight="bold")
 
     # Alternate row shading; special style for the section divider row
-    divider_row = 8  # "— Placebo test —" is at index 7 in metrics_data → row 8 in table
+    divider_row = 8  # divider is at index 7 in metrics_data → row 8 in table
     for i in range(1, len(metrics_data) + 1):
         if i == divider_row:
             for j in range(len(col_labels)):
                 tbl[i, j].set_facecolor("#D0D8F0")
                 tbl[i, j].set_text_props(fontweight="bold", fontstyle="italic")
+            # Visually merge: hide right cell content and borders, widen left cell
+            tbl[i, 0].set_width(tbl[i, 0].get_width() + tbl[i, 1].get_width())
+            tbl[i, 1].set_text_props(color="#D0D8F0")  # invisible text
+            tbl[i, 1].set_edgecolor("#D0D8F0")          # hide borders
         else:
             for j in range(len(col_labels)):
                 tbl[i, j].set_facecolor("#EEF2FF" if i % 2 == 0 else "white")
