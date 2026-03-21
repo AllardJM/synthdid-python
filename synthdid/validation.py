@@ -30,6 +30,7 @@ import matplotlib.gridspec as gridspec
 
 from .estimator import synthdid_estimate, SynthdidEstimate, _contract3
 from .inference import vcov
+from .summary import synthdid_effect_curve
 
 
 # ---------------------------------------------------------------------------
@@ -210,47 +211,22 @@ def synthdid_out_of_time(
     )
 
     # -------------------------------------------------------------------------
-    # Compute the counterfactual prediction for the predict period
+    # Compute actual, predicted, and residuals via synthdid_effect_curve.
     #
-    # Full formula (handles covariates):
-    #   Y_adj = Y - X_beta
-    #   intercept = mean_treated_pre(lambda) - omega @ mean_control_pre(lambda)
-    #   predicted(t) = omega @ Y_adj[:N0, t] + intercept + X_beta_treated_avg(t)
+    # With detail=True, effect_curve returns the full decomposition:
+    #   predicted(t) = omega @ Y_adj[control, t]
+    #                + intercept          (lambda-weighted pre-trend correction)
+    #                + X_beta_treated_avg(t)
+    #   actual(t)    = mean(Y[treated, t])
+    #   tau(t)       = actual(t) - predicted(t)
     # -------------------------------------------------------------------------
-    weights = est.weights
-    omega = weights["omega"]          # (N0,)
-    lambda_ = weights["lambda"]       # (T0_fit,)
+    curve = synthdid_effect_curve(est, detail=True)
+    actual    = curve.actual      # (T_predict,)
+    predicted = curve.predicted   # (T_predict,)
+    residuals = curve.tau         # actual - predicted
 
-    # Covariate-adjusted outcomes (Y_adj = Y - X_beta)
-    X_beta_fit = _contract3(est.setup["X"], weights["beta"])  # (N, T_pre+T_predict)
-    Y_adj = Y_fit - X_beta_fit
-
-    # Pre-period: lambda-weighted averages
-    Y_adj_pre = Y_adj[:, :T0_fit]                              # (N, T0_fit)
-    mean_control_pre = omega @ Y_adj_pre[:N0, :] @ lambda_     # scalar
-    mean_treated_pre = Y_adj_pre[N0:, :].mean(axis=0) @ lambda_  # scalar
-
-    intercept = mean_treated_pre - mean_control_pre
-
-    # Predict period columns in Y_fit (the last len(predict_cols) columns)
-    Y_adj_predict = Y_adj[:, T0_fit:]                       # (N, T_predict)
-    X_beta_predict = X_beta_fit[:, T0_fit:]                 # (N, T_predict)
-
-    # Synthetic control: omega @ adjusted control outcomes in predict period
-    synth_control = omega @ Y_adj_predict[:N0, :]           # (T_predict,)
-
-    # Add back covariate contribution for treated average
-    X_beta_treated_avg = X_beta_predict[N0:, :].mean(axis=0)  # (T_predict,)
-
-    predicted = synth_control + intercept + X_beta_treated_avg  # (T_predict,)
-
-    # Actual treated average (raw Y scale)
-    actual = Y[N0:, predict_cols].mean(axis=0)              # (T_predict,)
-
-    # Per-unit actuals (raw Y)
-    actual_by_unit = Y[N0:, :][:, predict_cols]             # (N1, T_predict)
-
-    residuals = actual - predicted
+    # Per-unit actuals (raw Y, not averaged)
+    actual_by_unit = Y_fit[N0:, T0_fit:]  # (N1, T_predict)
 
     metrics = _compute_metrics(actual, predicted)
 

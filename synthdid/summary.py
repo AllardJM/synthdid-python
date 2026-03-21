@@ -6,34 +6,93 @@ Ported from R/synthdid.R (synthdid_effect_curve) and R/summary.R
 Reference: https://arxiv.org/abs/1812.09970
 """
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 
 from .estimator import SynthdidEstimate, _contract3
 
 
-def synthdid_effect_curve(estimate):
+@dataclass
+class EffectCurveDetail:
+    """
+    Detailed output of synthdid_effect_curve(detail=True).
+
+    Attributes
+    ----------
+    tau : ndarray, shape (T1,)
+        Period-by-period treatment effect: actual - predicted.
+    actual : ndarray, shape (T1,)
+        Average of treated units in each post-treatment period (raw Y).
+    predicted : ndarray, shape (T1,)
+        Synthetic control counterfactual for the treated average.
+        Formula:
+            predicted(t) = omega @ Y_adj[control, t]
+                         + intercept
+                         + X_beta_treated_avg(t)
+        where intercept = mean_treated_pre(lambda) - omega @ mean_control_pre(lambda)
+    intercept : float
+        Pre-treatment level correction that aligns the synthetic control to
+        the treated group (the DID component).
+    time_names : list
+        Time labels for the post-treatment periods.
+    """
+    tau: np.ndarray
+    actual: np.ndarray
+    predicted: np.ndarray
+    intercept: float
+    time_names: list
+
+    def __repr__(self):
+        return (
+            f"EffectCurveDetail(\n"
+            f"  periods   = {self.time_names[0]}..{self.time_names[-1]}\n"
+            f"  tau       = [{', '.join(f'{v:.2f}' for v in self.tau)}]\n"
+            f"  actual    = [{', '.join(f'{v:.2f}' for v in self.actual)}]\n"
+            f"  predicted = [{', '.join(f'{v:.2f}' for v in self.predicted)}]\n"
+            f"  intercept = {self.intercept:.4f}\n"
+            f")"
+        )
+
+
+def synthdid_effect_curve(estimate, detail=False):
     """
     Compute the period-by-period treatment effect curve.
 
-    For each post-treatment period t, this gives the difference between
-    the observed treated average and its synthetic control counterfactual,
-    adjusted for pre-treatment trends using the estimated lambda weights.
+    For each post-treatment period t, returns the difference between the
+    observed treated average and its synthetic control counterfactual,
+    adjusted for pre-treatment trends via the estimated lambda weights.
 
-    Mathematically:
-        tau_sc(t) = [-omega^T, (1/N1)·1^T] @ Y   for all T periods
-        tau_curve(t) = tau_sc(T0 + t) - tau_sc[0:T0] @ lambda
-                       for t = 1, ..., T1
+    Decomposition:
+        Y_adj(t)      = Y(t) - X_beta(t)            (covariate adjustment)
+        tau_sc(t)     = [-omega, 1/N1] @ Y_adj(t)   (synth control difference)
+        intercept     = tau_sc[:T0] @ lambda         (lambda-weighted pre-trend)
+        tau(t)        = tau_sc(T0+t) - intercept     (treatment effect)
+
+    When detail=True, also returns:
+        actual(t)     = mean(Y[treated, T0+t])
+        predicted(t)  = actual(t) - tau(t)
+                      = omega @ Y_adj[control, T0+t]
+                        + intercept
+                        + X_beta_treated_avg(T0+t)
 
     Parameters
     ----------
     estimate : SynthdidEstimate
         Output of synthdid_estimate().
+    detail : bool
+        If False (default), return a plain ndarray of treatment effects —
+        identical to the original behaviour, fully backwards compatible.
+        If True, return an EffectCurveDetail object with tau, actual,
+        predicted, intercept, and time_names.
 
     Returns
     -------
     ndarray, shape (T1,)
-        Estimated treatment effect for each post-treatment period.
+        When detail=False (default).
+    EffectCurveDetail
+        When detail=True.
     """
     setup = estimate.setup
     weights = estimate.weights
@@ -43,20 +102,45 @@ def synthdid_effect_curve(estimate):
     N1 = Y.shape[0] - N0
     T1 = Y.shape[1] - T0
 
-    # Subtract covariate contribution if covariates were used
+    # Covariate adjustment
     X_beta = _contract3(setup["X"], weights["beta"])
     Y_adj = Y - X_beta
 
-    # Synthetic control trajectory across all time periods: shape (T,)
+    # Synthetic control trajectory across all periods: shape (T,)
     w_unit = np.concatenate([-weights["omega"], np.ones(N1) / N1])
-    tau_sc = w_unit @ Y_adj  # (T,)
+    tau_sc = w_unit @ Y_adj
 
-    # Pre-treatment weighted average (the "trend" to subtract)
-    tau_pre = tau_sc[:T0] @ weights["lambda"]  # scalar
+    # Lambda-weighted pre-treatment intercept (the DID level correction)
+    intercept = float(tau_sc[:T0] @ weights["lambda"])
 
-    # Post-treatment effect curve
-    tau_curve = tau_sc[T0:] - tau_pre  # shape (T1,)
-    return tau_curve
+    # Period-by-period treatment effect
+    tau_curve = tau_sc[T0:] - intercept
+
+    if not detail:
+        return tau_curve
+
+    # --- detailed decomposition ---
+    # actual: raw treated average (Y scale, not adjusted)
+    actual = Y[N0:, T0:].mean(axis=0)
+
+    # predicted: synthetic control counterfactual on the Y scale
+    #   = omega @ Y_adj[control, post] + intercept + X_beta_treated_avg
+    synth_control = weights["omega"] @ Y_adj[:N0, T0:]       # (T1,)
+    X_beta_treated_avg = X_beta[N0:, T0:].mean(axis=0)       # (T1,)
+    predicted = synth_control + intercept + X_beta_treated_avg
+
+    time_names = (
+        estimate.time_names[T0:] if estimate.time_names
+        else list(range(T0, T0 + T1))
+    )
+
+    return EffectCurveDetail(
+        tau=tau_curve,
+        actual=actual,
+        predicted=predicted,
+        intercept=intercept,
+        time_names=time_names,
+    )
 
 
 def synthdid_controls(estimates, sort_by=0, mass=0.9, weight_type="omega"):
