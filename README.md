@@ -70,9 +70,16 @@ Estimate variance (SE²). Three methods:
 - **`bootstrap`**: requires more than one treated unit
 - **`jackknife`**: fastest, but not recommended for synthetic control estimates (can underestimate variance); returns NaN with a single treated unit
 
-### `synthdid_effect_curve(estimate)`
+### `synthdid_effect_curve(estimate, detail=False)`
 Period-by-period treatment effect for each post-treatment time period.
-Returns an array of length T1.
+
+- `detail=False` *(default)*: returns a plain `ndarray` of shape `(T1,)` — fully backwards compatible
+- `detail=True`: returns an `EffectCurveDetail` object with fields:
+  - `tau` — treatment effect per period (actual − predicted)
+  - `actual` — average treated outcome per period
+  - `predicted` — synthetic control counterfactual per period
+  - `intercept` — lambda-weighted pre-trend correction (the DID component)
+  - `time_names` — post-treatment period labels
 
 ### `synthdid_controls(estimate, weight_type='omega', mass=0.9)`
 Table of the most influential control units (`weight_type='omega'`) or
@@ -82,6 +89,33 @@ truncated to cover at least `mass` fraction of total weight.
 ### `synthdid_plot(estimate, se=None)`
 Matplotlib figure showing treated and synthetic control trajectories,
 the 2×2 DiD diagram, treatment effect arrow, and lambda weight distribution.
+
+### `synthdid_out_of_time(Y, N0, pre_periods, predict_periods, ...)`
+Out-of-time validation. Fits the model on `pre_periods` and evaluates
+counterfactual predictions on a separate `predict_periods` (which need not
+be contiguous with or follow the pre period). Returns an `OOTResult` with:
+- `actual`, `predicted`, `residuals` — per-period arrays
+- `actual_by_unit` — individual treated unit outcomes in the predict period
+- `metrics` — RMSE, MAE, MAPE, R², Bias, Max Abs Error
+- `placebo_tau`, `placebo_se`, `placebo_pvalue` — synthdid significance test on the predict period (should be non-significant for a pre-treatment holdout)
+
+```python
+oot = synthdid_out_of_time(
+    Y, N0,
+    pre_periods=range(0, 14),      # fit on 1970-1983
+    predict_periods=range(14, 19), # evaluate on 1984-1988
+    unit_names=setup["unit_names"],
+    time_names=time_names,
+    se_method="placebo",           # or "jackknife", "bootstrap"
+)
+print(oot)
+# RMSE=1.55, R²=0.91, placebo p=0.936 ✓
+```
+
+### `synthdid_oot_plot(result)`
+Three-panel figure for OOT validation: actual vs predicted trajectories,
+residuals bar chart, and performance metrics table (including synthdid
+placebo test with SE method labelled).
 
 ## Validated Results
 
