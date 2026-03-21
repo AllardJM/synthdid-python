@@ -19,6 +19,7 @@ from .estimator import synthdid_estimate, SynthdidEstimate
 from .inference import vcov
 from .summary import synthdid_effect_curve, synthdid_controls
 from .plot import synthdid_plot
+from .validation import synthdid_out_of_time, synthdid_oot_plot, OOTResult
 
 __all__ = [
     "panel_matrices",
@@ -29,4 +30,7 @@ __all__ = [
     "synthdid_effect_curve",
     "synthdid_controls",
     "synthdid_plot",
+    "synthdid_out_of_time",
+    "synthdid_oot_plot",
+    "OOTResult",
 ]
