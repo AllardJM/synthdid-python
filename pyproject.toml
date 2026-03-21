@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "synthdid"
+version = "0.1.0"
+description = "Synthetic Difference-in-Differences estimator — Python port of the R synthdid package"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.22",
+    "pandas>=1.4",
+    "matplotlib>=3.5",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/AllardJM/synthdid-python"
+"R package" = "https://github.com/synth-inference/synthdid"
+"Paper" = "https://arxiv.org/abs/1812.09970"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["synthdid*"]
