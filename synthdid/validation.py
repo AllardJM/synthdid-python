@@ -394,19 +394,22 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
     ax_table.axis("off")
     m = result.metrics
     pv = result.placebo_pvalue
+    se_label = f"SE ({result.se_method})"
+
+    # Two sections: prediction metrics (rows 1-7) and synthdid test (rows 8-10)
     metrics_data = [
-        ["RMSE",          f"{m['RMSE']:.4f}"],
-        ["MAE",           f"{m['MAE']:.4f}"],
-        ["MAPE",          f"{m['MAPE']:.2f}%"],
-        ["R²",            f"{m['R2']:.4f}"],
-        ["Bias",          f"{m['Bias']:.4f}"],
-        ["Max Abs Error", f"{m['MaxAbsError']:.4f}"],
-        ["N periods",     str(m['N'])],
-        [f"  Synthdid test ({result.se_method} SE)", ""],
-        ["τ",             f"{result.placebo_tau:.4f}"],
-        [f"SE ({result.se_method})", f"{result.placebo_se:.4f}"],
-        ["p-value",       f"{pv:.3f}  {'✓' if pv > 0.05 else '✗'}"],
+        ["RMSE",       f"{m['RMSE']:.4f}"],
+        ["MAE",        f"{m['MAE']:.4f}"],
+        ["MAPE",       f"{m['MAPE']:.2f}%"],
+        ["R²",         f"{m['R2']:.4f}"],
+        ["Bias",       f"{m['Bias']:.4f}"],
+        ["Max Abs Err",f"{m['MaxAbsError']:.4f}"],
+        ["N periods",  str(m['N'])],
+        ["τ (synthdid)",f"{result.placebo_tau:.4f}"],
+        [se_label,     f"{result.placebo_se:.4f}"],
+        ["p-value",    f"{pv:.3f}  {'✓' if pv > 0.05 else '✗'}"],
     ]
+    # Two column headers: left blank, right blank — title does the labelling
     col_labels = ["Metric", "Value"]
 
     tbl = ax_table.table(
@@ -414,39 +417,41 @@ def synthdid_oot_plot(result, show_units=True, figsize=(13, 10)):
         colLabels=col_labels,
         loc="center",
         cellLoc="center",
-        bbox=[0.05, 0.0, 0.9, 1.0],   # [left, bottom, width, height] in axes coords
+        bbox=[0.05, 0.0, 0.9, 1.0],
     )
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(9.5)
 
-    # Style header
-    for j in range(len(col_labels)):
+    # Header row
+    for j in range(2):
         tbl[0, j].set_facecolor("#4472C4")
         tbl[0, j].set_text_props(color="white", fontweight="bold")
 
-    # Alternate row shading; special style for the section divider row
-    divider_row = 8  # divider is at index 7 in metrics_data → row 8 in table
-    for i in range(1, len(metrics_data) + 1):
-        if i == divider_row:
-            for j in range(len(col_labels)):
-                tbl[i, j].set_facecolor("#D0D8F0")
-                tbl[i, j].set_text_props(fontweight="bold", fontstyle="italic")
-            # Visually merge: hide right cell content and borders, widen left cell
-            tbl[i, 0].set_width(tbl[i, 0].get_width() + tbl[i, 1].get_width())
-            tbl[i, 1].set_text_props(color="#D0D8F0")  # invisible text
-            tbl[i, 1].set_edgecolor("#D0D8F0")          # hide borders
-        else:
-            for j in range(len(col_labels)):
-                tbl[i, j].set_facecolor("#EEF2FF" if i % 2 == 0 else "white")
+    # Rows 1-7: prediction metrics — light blue alternating
+    for i in range(1, 8):
+        for j in range(2):
+            tbl[i, j].set_facecolor("#EEF2FF" if i % 2 == 0 else "white")
 
-    # Colour the p-value row green/red
-    pv_row = len(metrics_data)  # last row
-    pv_color = "#D4EDDA" if result.placebo_pvalue > 0.05 else "#F8D7DA"
-    for j in range(len(col_labels)):
-        tbl[pv_row, j].set_facecolor(pv_color)
+    # Rows 8-10: synthdid test — distinct warm shading
+    for i in range(8, 11):
+        for j in range(2):
+            tbl[i, j].set_facecolor("#FFF8E7" if i % 2 == 0 else "#FFF3D6")
+        tbl[i, 0].set_text_props(fontstyle="italic")
 
-    ax_table.set_title("Performance Metrics", fontsize=10,
-                       fontweight="bold", pad=8)
+    # p-value row: green or red
+    pv_color = "#D4EDDA" if pv > 0.05 else "#F8D7DA"
+    for j in range(2):
+        tbl[10, j].set_facecolor(pv_color)
+        tbl[10, j].set_text_props(fontweight="bold")
+
+    # Draw a visible top border on row 8 to separate the two sections
+    for j in range(2):
+        tbl[8, j].visible_edges = "TBL" if j == 0 else "TBR"
+
+    ax_table.set_title(
+        f"Prediction Metrics  |  Synthdid test ({result.se_method} SE)",
+        fontsize=9, fontweight="bold", pad=8,
+    )
 
     return fig
 
