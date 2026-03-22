@@ -13,6 +13,8 @@ synthdid_effect_curve Period-by-period treatment effect curve.
 synthdid_controls     Table of control unit/time weights.
 synthdid_plot         Visualization of the estimate.
 synthdid_weights_plot Bar charts of top-N control units and time periods by weight.
+SynthDID             Sklearn-style estimator class with fit() / summary().
+SynthDIDResults      Statsmodels-style results table returned by SynthDID.summary().
 """
 
 from .panel import panel_matrices, collapsed_form
@@ -21,6 +23,7 @@ from .inference import vcov
 from .summary import synthdid_effect_curve, synthdid_controls, EffectCurveDetail
 from .plot import synthdid_plot, synthdid_weights_plot
 from .validation import synthdid_out_of_time, synthdid_oot_plot, OOTResult
+from .model import SynthDID, SynthDIDResults
 
 __all__ = [
     "panel_matrices",
@@ -36,4 +39,6 @@ __all__ = [
     "synthdid_out_of_time",
     "synthdid_oot_plot",
     "OOTResult",
+    "SynthDID",
+    "SynthDIDResults",
 ]
