@@ -27,7 +27,7 @@ from synthdid import (
 
 DATA_PATH = os.path.join(
     os.path.dirname(__file__),
-    "..", "..", "syntheticdid", "synthdid", "data", "california_prop99.csv"
+    "..", "data", "california_prop99.csv"
 )
 
 
