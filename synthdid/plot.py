@@ -189,3 +189,75 @@ def synthdid_plot(estimate, se=None, treated_name="Treated", control_name="Synth
 
     plt.tight_layout()
     return fig
+
+
+def synthdid_weights_plot(estimate, top_n=10, figsize=(12, 5)):
+    """
+    Plot the top-N most important control units (omega) and pre-treatment
+    time periods (lambda) as ranked bar charts.
+
+    Creates a two-panel figure:
+      - Left panel:  horizontal bar chart of the top-N control units by omega weight.
+      - Right panel: vertical bar chart of the top-N pre-treatment periods by lambda weight.
+
+    A dashed reference line marks the uniform weight (1/N0 or 1/T0) in each panel.
+
+    Parameters
+    ----------
+    estimate : SynthdidEstimate
+        Output of synthdid_estimate().
+    top_n : int
+        Number of top units / periods to display. Default 10.
+    figsize : tuple
+        Figure size in inches. Default (12, 5).
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    """
+    from .summary import synthdid_controls
+
+    omega_df = synthdid_controls(estimate, top_n=top_n, weight_type="omega")
+    lambda_df = synthdid_controls(estimate, top_n=top_n, weight_type="lambda")
+
+    omega_vals = omega_df.iloc[:, 0].values
+    omega_labels = list(omega_df.index)
+    lambda_vals = lambda_df.iloc[:, 0].values
+    lambda_labels = [str(l) for l in lambda_df.index]
+
+    N0 = estimate.setup["N0"]
+    T0 = estimate.setup["T0"]
+    uniform_omega = 1.0 / N0
+    uniform_lambda = 1.0 / T0
+
+    fig, (ax_omega, ax_lambda) = plt.subplots(1, 2, figsize=figsize)
+
+    # ------------------------------------------------------------------
+    # Left panel: control unit weights (omega) — horizontal bars
+    # ------------------------------------------------------------------
+    y_pos = np.arange(len(omega_labels))
+    ax_omega.barh(y_pos, omega_vals[::-1], color="steelblue", alpha=0.75)
+    ax_omega.axvline(uniform_omega, color="gray", linestyle="--", linewidth=0.9,
+                     label=f"Uniform (1/{N0})")
+    ax_omega.set_yticks(y_pos)
+    ax_omega.set_yticklabels(omega_labels[::-1], fontsize=9)
+    ax_omega.set_xlabel("Weight (ω)")
+    ax_omega.set_title(f"Top-{len(omega_labels)} Control Units by ω Weight")
+    ax_omega.legend(fontsize=8)
+
+    # ------------------------------------------------------------------
+    # Right panel: time-period weights (lambda) — vertical bars
+    # ------------------------------------------------------------------
+    x_pos = np.arange(len(lambda_labels))
+    ax_lambda.bar(x_pos, lambda_vals, color="steelblue", alpha=0.75)
+    ax_lambda.axhline(uniform_lambda, color="gray", linestyle="--", linewidth=0.9,
+                      label=f"Uniform (1/{T0})")
+    ax_lambda.set_xticks(x_pos)
+    ax_lambda.set_xticklabels(lambda_labels, rotation=45, ha="right", fontsize=9)
+    ax_lambda.set_ylabel("Weight (λ)")
+    ax_lambda.set_title(f"Top-{len(lambda_labels)} Pre-treatment Periods by λ Weight")
+    ax_lambda.legend(fontsize=8)
+
+    fig.suptitle("SynthDiD Weight Importance", fontsize=12, y=1.01)
+    plt.tight_layout()
+    return fig

@@ -23,8 +23,6 @@ env/
 htmlcov/
 
 # Generated outputs
-examples/output/
-*.png
 *.pdf
 
 # IDE

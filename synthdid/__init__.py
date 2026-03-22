@@ -12,13 +12,14 @@ vcov                  Estimate variance via placebo, bootstrap, or jackknife.
 synthdid_effect_curve Period-by-period treatment effect curve.
 synthdid_controls     Table of control unit/time weights.
 synthdid_plot         Visualization of the estimate.
+synthdid_weights_plot Bar charts of top-N control units and time periods by weight.
 """
 
 from .panel import panel_matrices, collapsed_form
 from .estimator import synthdid_estimate, SynthdidEstimate
 from .inference import vcov
 from .summary import synthdid_effect_curve, synthdid_controls, EffectCurveDetail
-from .plot import synthdid_plot
+from .plot import synthdid_plot, synthdid_weights_plot
 from .validation import synthdid_out_of_time, synthdid_oot_plot, OOTResult
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "synthdid_controls",
     "EffectCurveDetail",
     "synthdid_plot",
+    "synthdid_weights_plot",
     "synthdid_out_of_time",
     "synthdid_oot_plot",
     "OOTResult",

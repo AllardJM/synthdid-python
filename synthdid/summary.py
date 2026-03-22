@@ -143,7 +143,7 @@ def synthdid_effect_curve(estimate, detail=False):
     )
 
 
-def synthdid_controls(estimates, sort_by=0, mass=0.9, weight_type="omega"):
+def synthdid_controls(estimates, sort_by=0, mass=0.9, top_n=None, weight_type="omega"):
     """
     Summarize the most important control units or time periods by weight.
 
@@ -159,6 +159,10 @@ def synthdid_controls(estimates, sort_by=0, mass=0.9, weight_type="omega"):
         Index of the estimate to sort by. Default 0.
     mass : float
         Minimum cumulative weight to retain. Default 0.9 (top 90% of weight).
+        Ignored when top_n is provided.
+    top_n : int or None
+        If provided, return exactly this many rows (or fewer if there are fewer
+        units/periods). Takes precedence over mass.
     weight_type : {'omega', 'lambda'}
         Whether to summarize unit weights ('omega') or time weights ('lambda').
 
@@ -210,13 +214,16 @@ def synthdid_controls(estimates, sort_by=0, mass=0.9, weight_type="omega"):
     sorted_weights = all_weights[order]
     sorted_labels = [labels[i] for i in order]
 
-    # Truncate: find smallest prefix with cumulative weight >= mass
-    def _min_prefix(col):
-        cumsum = np.cumsum(col)
-        idx = np.searchsorted(cumsum, mass, side="left")
-        return min(idx + 1, len(col))
+    # Truncate: top_n overrides mass-based truncation
+    if top_n is not None:
+        tab_len = min(top_n, len(sorted_labels))
+    else:
+        def _min_prefix(col):
+            cumsum = np.cumsum(col)
+            idx = np.searchsorted(cumsum, mass, side="left")
+            return min(idx + 1, len(col))
 
-    tab_len = max(_min_prefix(sorted_weights[:, j]) for j in range(sorted_weights.shape[1]))
+        tab_len = max(_min_prefix(sorted_weights[:, j]) for j in range(sorted_weights.shape[1]))
 
     tab = sorted_weights[:tab_len]
     labels_trunc = sorted_labels[:tab_len]
