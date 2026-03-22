@@ -57,10 +57,100 @@ class SynthdidEstimate:
         return float(self.estimate)
 
     def __repr__(self):
-        return f"SynthdidEstimate(tau={self.estimate:.4f})"
+        N, T = self.setup["Y"].shape
+        N0, T0 = self.setup["N0"], self.setup["T0"]
+        return (
+            f"SynthdidEstimate(tau={self.estimate:.4f},"
+            f" n_units={N}, n_control={N0}, n_treated={N - N0},"
+            f" n_pre={T0}, n_post={T - T0})"
+        )
 
     def __format__(self, spec):
         return format(self.estimate, spec)
+
+    def summary(self, se_method="placebo", replications=200):
+        """
+        Compute standard error and return a formatted results table.
+
+        Parameters
+        ----------
+        se_method : {'placebo', 'bootstrap', 'jackknife'}
+            Variance estimation method. Default 'placebo'.
+        replications : int
+            Number of replications for placebo / bootstrap. Default 200.
+
+        Returns
+        -------
+        SynthDIDResults
+            Results object whose str() renders a statsmodels-style table.
+        """
+        from .inference import vcov
+        from .results import SynthDIDResults
+        import numpy as np
+
+        variance = vcov(self, method=se_method, replications=replications)
+        se = float(np.sqrt(variance))
+        N, T = self.setup["Y"].shape
+        N0, T0 = self.setup["N0"], self.setup["T0"]
+        return SynthDIDResults(
+            tau=self.estimate,
+            se=se,
+            se_method=se_method,
+            replications=replications,
+            n_units=N,
+            n_periods=T,
+            n_control=N0,
+            n_treated=N - N0,
+            n_pre=T0,
+            n_post=T - T0,
+        )
+
+    def plot(self, se=None, **kwargs):
+        """
+        Plot the estimate. See synthdid_plot() for full parameter docs.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+        """
+        from .plot import synthdid_plot
+        return synthdid_plot(self, se=se, **kwargs)
+
+    def weights_plot(self, **kwargs):
+        """
+        Bar charts of top-N control units and time periods by weight.
+        See synthdid_weights_plot() for full parameter docs.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+        """
+        from .plot import synthdid_weights_plot
+        return synthdid_weights_plot(self, **kwargs)
+
+    def effect_curve(self, detail=False):
+        """
+        Period-by-period treatment effect curve.
+        See synthdid_effect_curve() for full parameter docs.
+
+        Returns
+        -------
+        ndarray or EffectCurveDetail
+        """
+        from .summary import synthdid_effect_curve
+        return synthdid_effect_curve(self, detail=detail)
+
+    def top_weights(self, top_n=10, weight_type="omega"):
+        """
+        Table of the most important control units or time periods by weight.
+        See synthdid_controls() for full parameter docs.
+
+        Returns
+        -------
+        pd.DataFrame
+        """
+        from .summary import synthdid_controls
+        return synthdid_controls(self, top_n=top_n, weight_type=weight_type)
 
 
 def synthdid_estimate(
