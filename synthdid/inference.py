@@ -206,7 +206,6 @@ def _bootstrap_se(estimate, replications):
 
     N = setup["Y"].shape[0]
     N0 = setup["N0"]
-    N1 = N - N0
 
     if N0 == N - 1:
         raise ValueError(

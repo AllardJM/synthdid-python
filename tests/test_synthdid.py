@@ -201,7 +201,6 @@ class TestEffectCurve:
         est, _ = prop99_estimate
         curve = synthdid_effect_curve(est)
         # The point estimate is the uniform average over post-treatment periods
-        T1 = len(curve)
         assert abs(np.mean(curve) - float(est)) < 0.01
 
 

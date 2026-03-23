@@ -9,7 +9,6 @@ Ported from R/synthdid.R in the synthdid package.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 

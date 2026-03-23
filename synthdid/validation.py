@@ -20,15 +20,14 @@ This is the same formula as synthdid_effect_curve, but expressed as a level
 rather than a difference, allowing standard regression-style evaluation metrics.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Optional, Union
+from dataclasses import dataclass
+from typing import List
 
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-from .estimator import synthdid_estimate, SynthdidEstimate, _contract3
+from .estimator import synthdid_estimate, SynthdidEstimate
 from .inference import vcov
 from .summary import synthdid_effect_curve
 
@@ -166,7 +165,6 @@ def synthdid_out_of_time(
     """
     Y = np.asarray(Y, dtype=float)
     N, T = Y.shape
-    N1 = N - N0
 
     # Resolve period specs to sorted lists of column indices
     pre_cols = _resolve_periods(pre_periods, T)

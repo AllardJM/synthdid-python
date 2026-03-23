@@ -6,7 +6,6 @@ Reference: https://arxiv.org/abs/1812.09970
 """
 
 import numpy as np
-import pandas as pd
 
 
 def panel_matrices(panel, unit=0, time=1, outcome=2, treatment=3, treated_last=True):
@@ -79,7 +78,6 @@ def panel_matrices(panel, unit=0, time=1, outcome=2, treatment=3, treated_last=T
 
     # Sort and pivot to wide format
     panel = panel.sort_values([unit_col, time_col])
-    units = panel[unit_col].unique().tolist()
     times = sorted(panel[time_col].unique().tolist())
 
     Y = panel.pivot(index=unit_col, columns=time_col, values=outcome_col)

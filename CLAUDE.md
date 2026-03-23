@@ -107,8 +107,11 @@ Key conventions:
 
 ## Code style
 
-- No formatter or linter is configured — keep style consistent with the
-  existing code (PEP 8, ~90 char lines)
+- Linter: **ruff** (config in `pyproject.toml`). Run before committing:
+  ```bash
+  .venv/bin/ruff check synthdid/ tests/
+  ```
+  Auto-fix safe issues with `--fix`.
 - Type hints are not used; rely on docstring shape/type annotations instead
 - Inline comments explain *why*, not *what* — the code itself shows what
 - Mathematical quantities use their paper names: `omega`, `lambda_`, `tau`,

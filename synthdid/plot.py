@@ -10,7 +10,6 @@ Reference: https://arxiv.org/abs/1812.09970
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 from matplotlib.gridspec import GridSpec
 
 
@@ -223,7 +222,7 @@ def synthdid_weights_plot(estimate, top_n=10, figsize=(12, 5)):
     omega_vals = omega_df.iloc[:, 0].values
     omega_labels = list(omega_df.index)
     lambda_vals = lambda_df.iloc[:, 0].values
-    lambda_labels = [str(l) for l in lambda_df.index]
+    lambda_labels = [str(lbl) for lbl in lambda_df.index]
 
     N0 = estimate.setup["N0"]
     T0 = estimate.setup["T0"]

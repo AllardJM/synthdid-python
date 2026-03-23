@@ -24,3 +24,10 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["synthdid*"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]   # pycodestyle + pyflakes
+ignore = ["E501"]           # long lines — flagged but not enforced
