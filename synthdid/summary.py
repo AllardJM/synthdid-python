@@ -26,15 +26,15 @@ class EffectCurveDetail:
     actual : ndarray, shape (T1,)
         Average of treated units in each post-treatment period (raw Y).
     predicted : ndarray, shape (T1,)
-        Synthetic control counterfactual for the treated average.
-        Formula:
-            predicted(t) = omega @ Y_adj[control, t]
-                         + intercept
-                         + X_beta_treated_avg(t)
-        where intercept = mean_treated_pre(lambda) - omega @ mean_control_pre(lambda)
+        Synthetic control counterfactual for the treated average:
+            predicted(t) = omega @ Y_adj[control, t]  (synth control level)
+                         + intercept                   (pre-treatment alignment)
+                         + X_beta_treated_avg(t)       (covariate adjustment)
     intercept : float
-        Pre-treatment level correction that aligns the synthetic control to
-        the treated group (the DID component).
+        Lambda-weighted pre-treatment gap between the treated average and the
+        synthetic control. Subtracted from the post-treatment gap to remove
+        pre-existing level differences — this is the DID component that
+        distinguishes SynthDiD from plain synthetic control.
     time_names : list
         Time labels for the post-treatment periods.
     """
@@ -65,17 +65,27 @@ def synthdid_effect_curve(estimate, detail=False):
     adjusted for pre-treatment trends via the estimated lambda weights.
 
     Decomposition:
-        Y_adj(t)      = Y(t) - X_beta(t)            (covariate adjustment)
-        tau_sc(t)     = [-omega, 1/N1] @ Y_adj(t)   (synth control difference)
-        intercept     = tau_sc[:T0] @ lambda         (lambda-weighted pre-trend)
-        tau(t)        = tau_sc(T0+t) - intercept     (treatment effect)
+        Y_adj(t)  = Y(t) - X_beta(t)
+                    covariate-adjusted outcome matrix
 
-    When detail=True, also returns:
-        actual(t)     = mean(Y[treated, T0+t])
-        predicted(t)  = actual(t) - tau(t)
-                      = omega @ Y_adj[control, T0+t]
-                        + intercept
-                        + X_beta_treated_avg(T0+t)
+        gap(t)    = treated_avg(t) - omega @ control(t)   [on Y_adj]
+                    cross-sectional gap between treated and synthetic control
+                    at each time period t (= [-omega, 1/N1] @ Y_adj(t))
+
+        intercept = lambda @ gap[:T0]
+                    lambda-weighted pre-treatment gap; captures the pre-existing
+                    level difference between treated and synthetic control
+
+        tau(t)    = gap(T0+t) - intercept
+                    treatment effect at post-treatment period t; the DID removes
+                    the pre-existing gap so only the causal effect remains
+
+    When detail=True, also returns the levels (not just differences):
+        actual(t)    = mean(Y[treated, T0+t])           (raw treated average)
+        predicted(t) = omega @ Y_adj[control, T0+t]     (synth control level)
+                       + intercept                       (pre-treatment alignment)
+                       + X_beta_treated_avg(T0+t)        (covariate part)
+        tau(t)       = actual(t) - predicted(t)          (same as above)
 
     Parameters
     ----------
@@ -187,18 +197,10 @@ def synthdid_controls(estimates, sort_by=0, mass=0.9, top_n=None, weight_type="o
         all_weights = all_weights[:, np.newaxis]
 
     # Build row labels from the first estimate's setup
-    Y = estimates[0].setup["Y"]
     if weight_type == "omega":
-        # Unit labels: use unit_names if stored, else row index
-        unit_names = estimates[0].unit_names
-        labels = unit_names[:Y.shape[0] - (Y.shape[0] - estimates[0].setup["N0"])] \
-            if unit_names else [f"unit_{i}" for i in range(all_weights.shape[0])]
-        # Only control unit names (first N0)
         N0 = estimates[0].setup["N0"]
-        if unit_names:
-            labels = unit_names[:N0]
-        else:
-            labels = [f"unit_{i}" for i in range(N0)]
+        unit_names = estimates[0].unit_names
+        labels = unit_names[:N0] if unit_names else [f"unit_{i}" for i in range(N0)]
     else:
         # Time labels for pre-treatment periods
         time_names = estimates[0].time_names

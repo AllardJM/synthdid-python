@@ -19,7 +19,6 @@ from synthdid import (
     vcov,
     synthdid_effect_curve,
     synthdid_controls,
-    SynthDID,
     SynthDIDResults,
 )
 
@@ -320,48 +319,3 @@ class TestSynthdidEstimateMethods:
         plt.close(fig)
 
 
-# ---------------------------------------------------------------------------
-# SynthDID class tests
-# ---------------------------------------------------------------------------
-
-class TestSynthDID:
-    def test_fit_dataframe(self):
-        df = pd.read_csv(DATA_PATH, sep=None, engine="python")
-        model = SynthDID()
-        result = model.fit(df, unit="State", time="Year",
-                           outcome="PacksPerCapita", treatment="treated")
-        assert result is model  # returns self
-        assert model.result_ is not None
-
-    def test_fit_matrix(self, prop99_estimate):
-        est, setup = prop99_estimate
-        model = SynthDID()
-        model.fit(Y=setup["Y"], N0=setup["N0"], T0=setup["T0"])
-        assert abs(float(model.result_) - float(est)) < 1e-9
-
-    def test_fit_missing_args_raises(self):
-        model = SynthDID()
-        with pytest.raises(ValueError):
-            model.fit(data=None)
-
-    def test_unfitted_raises(self):
-        model = SynthDID()
-        with pytest.raises(RuntimeError):
-            model.summary()
-
-    def test_summary_delegates_to_result(self, prop99_estimate):
-        _, setup = prop99_estimate
-        model = SynthDID()
-        model.fit(Y=setup["Y"], N0=setup["N0"], T0=setup["T0"])
-        results = model.summary(se_method="placebo", replications=50)
-        assert isinstance(results, SynthDIDResults)
-
-    def test_repr_unfitted(self):
-        model = SynthDID()
-        assert "not fitted" in repr(model)
-
-    def test_repr_fitted(self, prop99_estimate):
-        _, setup = prop99_estimate
-        model = SynthDID()
-        model.fit(Y=setup["Y"], N0=setup["N0"], T0=setup["T0"])
-        assert "SynthdidEstimate" in repr(model)

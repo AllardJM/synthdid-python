@@ -345,9 +345,21 @@ def synthdid_estimate(
     weights.setdefault("beta", np.array([]))
 
     # -------------------------------------------------------------------------
-    # Compute the final treatment effect estimate
+    # Compute the final treatment effect estimate (Algorithm 1, step 3)
     #
-    # τ̂ = [-ω^T, (1/N1)·1^T] @ (Y - X·β) @ [-λ, (1/T1)·1^T]^T
+    # τ̂ is a 2×2 difference-in-differences:
+    #
+    #   τ̂ = (treated_avg − synth_control) in post periods
+    #       − (treated_avg − synth_control) in λ-weighted pre periods
+    #
+    # The first difference removes the cross-sectional gap (unit fixed effects).
+    # The second difference removes the pre-existing time trend (time fixed effects).
+    # Together they isolate the causal effect under parallel trends.
+    #
+    # Written as a single matrix product:
+    #   w_unit = [-ω, (1/N1)·1]   contrasts synth control vs treated average
+    #   w_time = [-λ, (1/T1)·1]   contrasts λ-weighted pre vs uniform post
+    #   τ̂ = w_unit @ (Y − Xβ) @ w_time
     # -------------------------------------------------------------------------
     X_beta = _contract3(X, weights["beta"])
 
