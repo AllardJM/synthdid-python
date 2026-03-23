@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "synthdid"
-version = "0.1.0"
+version = "0.2.0"
 description = "Synthetic Difference-in-Differences estimator — Python port of the R synthdid package"
 readme = "README.md"
 license = { file = "LICENSE" }

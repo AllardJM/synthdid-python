@@ -16,6 +16,12 @@ SynthdidEstimate      Result object — call .summary(), .plot(), .effect_curve(
 SynthDIDResults       Statsmodels-style results table returned by .summary().
 """
 
+from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PNF
+try:
+    __version__ = _pkg_version("synthdid")
+except _PNF:
+    __version__ = "0.2.0"
+
 from .panel import panel_matrices, collapsed_form
 from .estimator import synthdid_estimate, SynthdidEstimate
 from .inference import vcov
