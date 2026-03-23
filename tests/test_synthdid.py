@@ -19,6 +19,7 @@ from synthdid import (
     vcov,
     synthdid_effect_curve,
     synthdid_controls,
+    SynthDIDResults,
 )
 
 # ---------------------------------------------------------------------------
@@ -236,3 +237,85 @@ class TestControls:
         for mass in [0.8, 0.9, 0.95]:
             df = synthdid_controls(est, weight_type="omega", mass=mass)
             assert df.iloc[:, 0].sum() >= mass - 1e-9
+
+    def test_top_n(self, prop99_estimate):
+        est, _ = prop99_estimate
+        df = synthdid_controls(est, top_n=5, weight_type="omega")
+        assert len(df) == 5
+
+
+# ---------------------------------------------------------------------------
+# SynthdidEstimate method API tests
+# ---------------------------------------------------------------------------
+
+class TestSynthdidEstimateMethods:
+    def test_summary_returns_results(self, prop99_estimate):
+        est, _ = prop99_estimate
+        results = est.summary(se_method="placebo", replications=50)
+        assert isinstance(results, SynthDIDResults)
+
+    def test_summary_tau_matches_estimate(self, prop99_estimate):
+        est, _ = prop99_estimate
+        results = est.summary(se_method="placebo", replications=50)
+        assert abs(results.tau - float(est)) < 1e-9
+
+    def test_summary_se_positive(self, prop99_estimate):
+        est, _ = prop99_estimate
+        results = est.summary(se_method="placebo", replications=50)
+        assert results.se > 0
+
+    def test_summary_conf_int_ordered(self, prop99_estimate):
+        est, _ = prop99_estimate
+        results = est.summary(se_method="placebo", replications=50)
+        assert results.conf_int[0] < results.conf_int[1]
+
+    def test_summary_str_renders(self, prop99_estimate):
+        est, _ = prop99_estimate
+        results = est.summary(se_method="placebo", replications=50)
+        s = str(results)
+        assert "tau" in s
+        assert "SE Method" in s
+
+    def test_effect_curve_method(self, prop99_estimate):
+        est, _ = prop99_estimate
+        curve = est.effect_curve()
+        assert len(curve) == est.setup["Y"].shape[1] - est.setup["T0"]
+
+    def test_effect_curve_detail_method(self, prop99_estimate):
+        est, _ = prop99_estimate
+        detail = est.effect_curve(detail=True)
+        assert hasattr(detail, "tau")
+        assert hasattr(detail, "actual")
+        assert hasattr(detail, "predicted")
+
+    def test_top_weights_omega(self, prop99_estimate):
+        est, _ = prop99_estimate
+        df = est.top_weights(top_n=5, weight_type="omega")
+        assert len(df) == 5
+        assert df.index[0] == "Nevada"
+
+    def test_top_weights_lambda(self, prop99_estimate):
+        est, _ = prop99_estimate
+        df = est.top_weights(top_n=3, weight_type="lambda")
+        assert len(df) == 3
+        assert df.index[0] == "1988"
+
+    def test_plot_returns_figure(self, prop99_estimate):
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        est, _ = prop99_estimate
+        fig = est.plot()
+        assert fig is not None
+        plt.close(fig)
+
+    def test_weights_plot_returns_figure(self, prop99_estimate):
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        est, _ = prop99_estimate
+        fig = est.weights_plot(top_n=5)
+        assert fig is not None
+        plt.close(fig)
+
+
